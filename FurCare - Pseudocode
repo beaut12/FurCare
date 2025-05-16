@@ -1,0 +1,64 @@
+START
+
+DISPLAY Welcome Screen
+PROMPT User to Login or Sign Up
+
+IF user selects Sign Up THEN
+    PROMPT for registration details
+    VALIDATE and SAVE new user account
+    REDIRECT to Dashboard
+ELSE IF user selects Login THEN
+    PROMPT for login credentials
+    VALIDATE user
+    IF valid THEN
+        REDIRECT to Dashboard
+    ELSE
+        DISPLAY "Invalid Credentials"
+        RETURN to Login
+    ENDIF
+ENDIF
+
+DISPLAY Dashboard Options:
+    1. Add Pet
+    2. View Pets
+    3. Search Symptoms
+    4. Logout
+
+WHILE user is logged in DO
+    IF user selects Add Pet THEN
+        PROMPT for pet details (name, age, type, etc.)
+        VALIDATE and SAVE pet info to user's profile
+        RETURN to Dashboard
+
+    ELSE IF user selects View Pets THEN
+        DISPLAY list of user's pets
+        PROMPT to select a pet
+
+        DISPLAY Pet Options:
+            1. View Profile
+            2. Track Symptoms
+
+        IF user selects View Profile THEN
+            DISPLAY pet's details
+        ELSE IF user selects Track Symptoms THEN
+            PROMPT for symptom input
+            VALIDATE and SAVE symptom under selected pet
+        ENDIF
+
+        RETURN to Dashboard
+
+    ELSE IF user selects Search Symptoms THEN
+        PROMPT for symptom keyword(s)
+        SEARCH symptom database
+        DISPLAY matching results with health tips
+        RETURN to Dashboard
+
+    ELSE IF user selects Logout THEN
+        CLEAR session
+        REDIRECT to Login screen
+        BREAK loop
+    ENDIF
+ENDWHILE
+
+DISPLAY "Thank you for using FurCare Animal Hospital"
+END
