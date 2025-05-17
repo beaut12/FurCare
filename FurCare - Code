@@ -1,0 +1,464 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog, filedialog
+import json
+import os
+import csv
+from functools import partial
+
+# Constants
+USER_FILE = "users.json"
+PETS_FILE = "pets.json"
+users = {}
+all_pet_profiles = {}  # All users' pet data
+pet_profiles = []  # Active session's pet data
+current_user = None
+
+# Theme
+theme_color = "#00796B"
+current_theme = {
+    "bg": "#E0F7FA",
+    "fg": "#00796B",
+    "button_bg": theme_color,
+    "button_fg": "white"
+}
+header_font = ("Helvetica", 24, "bold")
+label_font = ("Helvetica", 14)
+button_font = ("Helvetica", 12, "bold")
+
+# UI Setup
+root = tk.Tk()
+root.title("FurCare Animal Hospital")
+root.attributes("-fullscreen", True)
+root.configure(bg=current_theme["bg"])
+
+
+# Sickness Tips
+symptom_tips = {
+    "Fever": "Ensure your pet stays hydrated and cool. If fever persists, visit a vet.",
+    "Vomiting": "Remove food for 12 hours. Provide water. If it continues, consult a vet.",
+    "Diarrhea": "Feed a bland diet like boiled chicken and rice. Ensure hydration.",
+    "Cough": "Keep pet warm and isolated. Steam can help. Persistent cough needs vet attention.",
+    "Skin rash": "Clean affected area with mild antiseptic. Avoid scratching. See vet if severe.",
+    "Ear infection": "Clean ears with vet-approved solution. Avoid water in ears. Visit a vet if smell or discharge appears.",
+    "Worms": "Use deworming medications recommended by a vet. Keep your pet's living area clean.",
+    "Fleas": "Use flea shampoo or vet-approved treatments. Wash bedding and vacuum frequently.",
+    "Vaccine on time": "Follow the vaccination schedule for you pet to prevent deadly diseases like, rabies, parvovirus, and distemper",
+    "Balanced Diet": "Feed pets species apppropriate, high quality food to strengthen their immune systems.",
+    "Diabetes": "Treatment for pet diabetes typically involves a combination of insulin, dietary changes, and regular monitoring of the pet’s blood glucose levels. \nDiabetes in pets is a manageable condition, but it does require owner commitment to achieve the best results. If your pet is diagnosed with diabetes, work closely with your vet and follow your pet’s treatment plan.",
+    "Arthritis": "Arthritis treatment for dogs and cats typically involves a combination of weight management, pain relief, and supportive therapies. Maintaining a healthy weight is crucial to reduce stress on the joints. \nRegular veterinary check-ups are essential to adjust the treatment plan as the condition progresses.",
+    "Skin Problem": "Skin problems in dogs and cats can arise from various causes, including parasites, allergies, infections, and underlying health conditions. \nIt's important to maintain good grooming habits, address any underlying causes, and consult a veterinarian for persistent or severe cases, as untreated skin conditions can lead to chronic discomfort and secondary infections.",
+}
+
+vaccination_info = {
+    "Dog Vaccine": "Initial Puppy Vaccination (at or under 16 weeks), Initial Adult Dog Vaccination (over 16 weeks), Booster Recommendation",
+    "Cat Vaccine": "Initial Kitten Vaccination (at or under 16 weeks), Initial Adult Cat Vaccination (over 16 weeks), Booster Recommendation",
+    "Rabies_dog": "For Dogs: Core dog vaccine. Rabies is 100% fatal to dogs, with no treatment available. Prevention is key.",
+    "Rabies_cats": "For Cats: Core cat vaccine. Rabies is 100% fatal to cats, with no treatment available. Prevention is key.",
+    "Parvovirus": "Core dog vaccine. Canine 'parvo' is contagious, and can cause severe vomiting and bloody diarrhea. Parvo is usually fatal if untreated.",
+    "Calicivirus": "Core cat vaccine. A very contagious upper respiratory condition that can cause joint pain, oral ulcerations, fever, and anorexia.",
+}
+
+# Data Handling
+def load_data():
+    global users, all_pet_profiles
+
+    # Load users
+    if os.path.exists(USER_FILE):
+        try:
+            with open(USER_FILE, "r") as f:
+                users.update(json.load(f))
+        except json.JSONDecodeError:
+            users.clear()
+
+    # Load pet profiles per user
+    if os.path.exists(PETS_FILE):
+        try:
+            with open(PETS_FILE, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    all_pet_profiles.update(data)
+                else:
+                    all_pet_profiles.clear()
+        except json.JSONDecodeError:
+            all_pet_profiles.clear()
+
+
+def save_users():
+    with open(USER_FILE, "w") as f:
+        json.dump(users, f)
+
+
+def save_pet_profiles():
+    if current_user:
+        all_pet_profiles[current_user] = pet_profiles
+        with open(PETS_FILE, "w") as f:
+            json.dump(all_pet_profiles, f)
+
+
+# Utility
+def clear_frame():
+    for widget in root.winfo_children():
+        widget.destroy()
+    add_footer()
+
+def labeled_entry(label_text, parent, show=None):
+    tk.Label(parent, text=label_text, font=label_font, bg=current_theme["bg"]).pack()
+    entry = tk.Entry(parent, font=label_font, show=show)
+    entry.pack()
+    return entry
+
+
+# first Screens
+def start_screen():
+    global pet_profiles, current_user
+    pet_profiles.clear()
+    current_user = None
+    clear_frame()
+    tk.Label(root, text="Welcome to FurCare 🐾", font=header_font,
+             bg=current_theme["bg"], fg=theme_color).pack(pady=20)
+
+    tk.Button(root, text="Log In", font=button_font,
+              bg=theme_color, fg="white", command=login).pack(pady=10)
+    tk.Button(root, text="Sign Up", font=button_font,
+              bg=theme_color, fg="white", command=register).pack(pady=10)
+    tk.Button(root, text="Exit", font=button_font,
+              command=root.destroy).pack(pady=10)
+
+#register, it will appear when you click the sign up
+def register():
+    clear_frame()
+    tk.Label(root, text="Register", font=header_font,
+             bg=current_theme["bg"], fg=theme_color).pack(pady=20)
+
+    username_entry = labeled_entry("Username", root)
+    password_entry = labeled_entry("Password", root, show="*")
+    confirm_entry = labeled_entry("Confirm Password", root, show="*")
+
+    def save_user():
+        user = username_entry.get().strip()
+        pwd = password_entry.get().strip()
+        confirm = confirm_entry.get().strip()
+        if not user or not pwd:
+            messagebox.showerror("Error", "Fields cannot be empty.")
+        elif pwd != confirm:
+            messagebox.showerror("Error", "Passwords do not match.")
+        else:
+            users[user] = pwd
+            all_pet_profiles[user] = []
+            save_users()
+            save_pet_profiles()
+            messagebox.showinfo("Success", "Registered successfully!")
+            login()
+
+    tk.Button(root, text="Sign Up", font=button_font,
+              bg=theme_color, fg="white", command=save_user).pack(pady=10)
+    tk.Button(root, text="Back", font=button_font, command=start_screen).pack()
+
+#To enter the main platform
+def login():
+    clear_frame()
+    tk.Label(root, text="Log In", font=header_font,
+             bg=current_theme["bg"], fg=theme_color).pack(pady=20)
+
+    username_entry = labeled_entry("Username", root)
+    password_entry = labeled_entry("Password", root, show="*")
+
+    def validate_user():
+        global current_user
+        user = username_entry.get().strip()
+        pwd = password_entry.get().strip()
+        if users.get(user) == pwd:
+            global current_user, pet_profiles
+            current_user = user
+            pet_profiles.clear()
+            pet_profiles.extend(all_pet_profiles.get(user, []))
+            menu()
+        else:
+            messagebox.showerror("Login Failed", "Invalid username or password")
+
+    tk.Button(root, text="Login", font=button_font,
+              bg=theme_color, fg="white", command=validate_user).pack(pady=10)
+    tk.Button(root, text="Forgot Password?", font=button_font,
+              command=reset_password_window).pack()
+    tk.Button(root, text="Back", font=button_font, command=start_screen).pack()
+
+
+def reset_password_window():
+    reset_win = tk.Toplevel(root)
+    reset_win.title("Reset Password")
+    reset_win.geometry("300x200")
+    reset_win.configure(bg=current_theme["bg"])
+
+    username_entry = labeled_entry("Username", reset_win)
+    new_password_entry = labeled_entry("New Password", reset_win, show="*")
+
+    def update_password():
+        username = username_entry.get().strip()
+        new_password = new_password_entry.get().strip()
+        if username in users:
+            users[username] = new_password
+            save_users()
+            messagebox.showinfo("Success", "Password reset.")
+            reset_win.destroy()
+        else:
+            messagebox.showerror("Error", "Username not found.")
+
+    tk.Button(reset_win, text="Reset", command=update_password).pack(pady=10)
+
+
+def menu():
+    clear_frame()
+    tk.Label(root, text="FurCare 🐶", font=header_font,
+             bg=current_theme["bg"], fg=theme_color).pack(pady=20)
+
+    btn_frame = tk.Frame(root, bg=current_theme["bg"])
+    btn_frame.pack(pady=10)
+    
+    tk.Label(root, text="Menu", font=header_font,
+             bg=current_theme["bg"], fg=theme_color).pack(pady=50)
+
+    btn_frame = tk.Frame(root, bg=current_theme["bg"])
+    btn_frame.pack(pady=30)
+
+
+    # Define all buttons in a list of tuples (label, command)
+    buttons = [
+        ("🔍 Search", search_info),
+        ("➕ Create Profile", create_pet_profile),
+        ("📄 Pet Profiles", view_pet_profiles),
+        ("🚪 Log Out", start_screen)
+    ]
+
+    for i, (text, command) in enumerate(buttons):
+        tk.Button(btn_frame, text=text, font=button_font, bg=theme_color, fg="white",
+                  width=18, height=2, command=command).grid(row=0, column=i, padx=10)
+
+
+def create_pet_profile():
+    clear_frame()
+    tk.Label(root, text="Create Pet Profile", font=header_font,
+             bg=current_theme["bg"], fg=theme_color).pack(pady=10)
+
+    name = simpledialog.askstring("Pet Name", "Enter your pet's name:")
+    if not name:
+        return view_pet_profiles()
+    age = simpledialog.askstring("Pet Age", "Enter your pet's age:")
+    weight = simpledialog.askstring("Pet Weight", "Enter your pet's weight (kg):")
+    gender = simpledialog.askstring("Pet Gender", "Enter your pet's gender (Male/Female):")
+    vaccine = simpledialog.askstring("Vaccination", "Enter vaccine (e.g., Dog/Cat Vaccine, Rabies, Parvovirus, Calicivirus):")
+    symptom_choice = simpledialog.askstring("Symptom", "Enter symptom (e.g., Fever, Diabetes, Arthritis, Skin Problems):")
+    image_path = filedialog.askopenfilename(title="Select Pet Photo", filetypes=[("PNG Files", "*.png")])
+
+    profile = {
+        "name": name,
+        "age": age,
+        "vaccine": vaccine,
+        "weight": weight,
+        "gender": gender,
+        "symptom": symptom_choice,
+        "image": image_path
+    }
+
+    pet_profiles.append(profile)
+    save_pet_profiles()
+    messagebox.showinfo("Done", "Pet profile created successfully!")
+    view_pet_profiles()
+
+
+def view_pet_profiles():
+    clear_frame()
+    tk.Label(root, text="Pet Profiles", font=header_font, bg=current_theme["bg"]).pack(pady=20)
+
+    # --- Scrollable Frame Setup ---
+    container = tk.Frame(root, bg=current_theme["bg"])
+    container.pack(fill="both", expand=True)
+
+    canvas = tk.Canvas(container, bg=current_theme["bg"], highlightthickness=0)
+    scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scroll_frame = tk.Frame(canvas, bg=current_theme["bg"])
+
+    scroll_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(
+            scrollregion=canvas.bbox("all")
+        )
+    )
+
+    canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    # Optional: Enable mousewheel scrolling
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+    # --- Pet Profile Cards ---
+    for profile in pet_profiles:
+        frame = tk.Frame(scroll_frame, bg="white", bd=2, relief="groove", padx=10, pady=10)
+        frame.pack(padx=20, pady=10, fill="x")
+
+        for key in ["name", "age", "vaccine", "weight", "gender", "symptom"]:
+            tk.Label(frame, text=f"{key.capitalize()}: {profile.get(key, '')}",
+                     font=label_font, bg="white", anchor="w").pack(anchor="w")
+
+        if profile.get("image"):
+            try:
+                img = tk.PhotoImage(file=profile["image"])
+                img = img.subsample(4, 4)
+                img_label = tk.Label(frame, image=img, bg="white")
+                img_label.image = img  # prevent garbage collection
+                img_label.pack()
+            except:
+                tk.Label(frame, text="[Image failed to load]", bg="white").pack()
+
+        btns = tk.Frame(frame, bg="white")
+        btns.pack(pady=5)
+        tk.Button(btns, text="Edit", command=partial(edit_pet_profile, profile)).pack(side="left", padx=5)
+        tk.Button(btns, text="Delete", command=partial(delete_pet_profile, profile)).pack(side="left", padx=5)
+
+    # --- Buttons at the bottom ---
+    tk.Button(root, text="Back to Menu", command=menu, font=button_font).pack(pady=10)
+    tk.Button(root, text="➕ Create New Pet", font=button_font,
+              bg=theme_color, fg="white", command=create_pet_profile).pack(pady=5)
+
+
+def delete_pet_profile(profile):
+    if messagebox.askyesno("Delete", f"Are you sure you want to delete {profile['name']}?"):
+        pet_profiles.remove(profile)
+        save_pet_profiles()
+        view_pet_profiles()
+
+
+def edit_pet_profile(profile):
+    clear_frame()
+    tk.Label(root, text="Edit Pet Profile", font=header_font, bg=current_theme["bg"], fg=theme_color).pack(pady=10)
+
+    name_var = tk.StringVar(value=profile.get("name", ""))
+    age_var = tk.StringVar(value=profile.get("age", ""))
+    vaccine_var = tk.StringVar(value=profile.get("vaccine", ""))
+    symptom_var = tk.StringVar(value=profile.get("symptom", ""))
+
+    name_entry = labeled_entry("Name", root)
+    name_entry.insert(0, name_var.get())
+
+    age_entry = labeled_entry("Age", root)
+    age_entry.insert(0, age_var.get())
+
+    vaccine_entry = labeled_entry("Vaccination Info", root)
+    vaccine_entry.insert(0, vaccine_var.get())
+
+    symptom_entry = labeled_entry("Symptoms", root)
+    symptom_entry.insert(0, symptom_var.get())
+
+    def update_profile():
+        profile['name'] = name_entry.get().strip()
+        profile['age'] = age_entry.get().strip()
+        profile['vaccine'] = vaccine_entry.get().strip()
+        profile['symptom'] = symptom_entry.get().strip()
+
+        new_img = filedialog.askopenfilename(title="Select New Photo", filetypes=[("PNG Files", "*.png")])
+        if new_img:
+            profile['image'] = new_img
+
+        save_pet_profiles()
+        messagebox.showinfo("Updated", "Pet profile has been updated.")
+        view_pet_profiles()
+
+    tk.Button(root, text="Save Changes", font=button_font, bg=theme_color, fg="white", command=update_profile).pack(pady=10)
+    tk.Button(root, text="Back", command=view_pet_profiles).pack(pady=10)
+
+
+def search_info():
+    clear_frame()
+    tk.Label(root, text="🔍 FurCare  🐾", font=header_font, bg=current_theme["bg"]).pack(pady=10)
+
+    keyword = simpledialog.askstring("Search", "Enter a pet name, symptom or vaccination to search:")
+    if not keyword:
+        return menu()
+
+    keyword = keyword.strip().lower()
+
+    container = tk.Frame(root, bg=current_theme["bg"])
+    container.pack(fill="both", expand=True)
+
+    canvas = tk.Canvas(container, bg=current_theme["bg"], highlightthickness=0)
+    scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scroll_frame = tk.Frame(canvas, bg=current_theme["bg"])
+    scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+    matched_profiles = [
+        p for p in pet_profiles
+    if keyword in p.get("name", "").lower() or
+       keyword in p.get("symptom", "").lower() or
+       keyword in p.get("vaccine", "").lower()
+    ]
+
+    # Show pet profiles
+    for profile in matched_profiles:
+        frame = tk.Frame(scroll_frame, bg="white", bd=2, relief="groove", padx=10, pady=10)
+        frame.pack(padx=20, pady=10, fill="x")
+
+        for key in ["name", "age", "vaccine", "weight", "gender", "symptom"]:
+            value = profile.get(key, "")
+            tk.Label(frame, text=f"{key.capitalize()}: {value}",
+                     font=label_font, bg="white", anchor="w").pack(anchor="w")
+
+        if profile.get("image"):
+            try:
+                img = tk.PhotoImage(file=profile["image"])
+                img = img.subsample(4, 4)
+                img_label = tk.Label(frame, image=img, bg="white")
+                img_label.image = img
+                img_label.pack()
+            except:
+                tk.Label(frame, text="[Image failed to load]", bg="white").pack()
+
+    # Show matching sickness tips
+    for k, v in symptom_tips.items():
+        if keyword in k.lower():
+            tip_frame = tk.Frame(scroll_frame, bg="#f0fff0", padx=10, pady=10, bd=1, relief="solid")
+            tip_frame.pack(padx=20, pady=10, fill="x")
+            tk.Label(tip_frame, text=f"🩺 Tip for {k}", font=label_font, bg="#f0fff0", anchor="w").pack(anchor="w")
+            tk.Label(tip_frame, text=v, font=label_font, bg="#f0fff0", anchor="w", wraplength=700, justify="left").pack(anchor="w")
+
+    # Show matching vaccine info
+    for k, v in vaccination_info.items():
+        if keyword in k.lower():
+            vac_frame = tk.Frame(scroll_frame, bg="#fff5e6", padx=10, pady=10, bd=1, relief="solid")
+            vac_frame.pack(padx=20, pady=10, fill="x")
+            tk.Label(vac_frame, text=f"💉 Vaccine Info: {k}", font=label_font, bg="#fff5e6", anchor="w").pack(anchor="w")
+            tk.Label(vac_frame, text=v, font=label_font, bg="#fff5e6", anchor="w", wraplength=700, justify="left").pack(anchor="w")
+
+    if not matched_profiles and not any(keyword in k.lower() for k in symptom_tips) and not any(keyword in k.lower() for k in vaccination_info):
+        tk.Label(scroll_frame, text="❌ No matches found.", font=label_font, bg="white").pack(pady=20)
+
+    tk.Button(root, text="Back to Menu", command=menu).pack(pady=10)
+
+
+def add_footer():
+    footer = tk.Frame(root, bg="#00796B")
+    footer.pack(side="bottom", fill="x")
+
+    left = tk.Label(footer, text="🐾 FurCare \nEvery paw deserves proper care", font=("Helvetica", 15, "italic"), bg="#00796B", fg="white")
+    left.pack(side="left", padx=50)
+
+    right_text = "📘 Facebook: FurCare   ✉️ furcare.pet@gmail.com   📞 09203420325"
+    right = tk.Label(footer, text=right_text, font=("Helvetica", 15), bg="#00796B", fg="white")
+    right.pack(side="right", padx=50)
+
+# Launch
+load_data()
+start_screen()
+root.mainloop()
