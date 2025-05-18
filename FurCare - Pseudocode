@@ -60,5 +60,4 @@ WHILE user is logged in DO
     ENDIF
 ENDWHILE
 
-DISPLAY "Thank you for using FurCare Animal Hospital"
 END
